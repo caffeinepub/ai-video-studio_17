@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import {
@@ -9,16 +8,14 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
+  Download,
   Film,
   Loader2,
-  Pause,
-  Play,
   RefreshCw,
   Timer,
   Trash2,
-  Video,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Duration, Status, Style } from "../backend.d";
 import { AuthGuard } from "../components/AuthGuard";
@@ -52,85 +49,36 @@ const durationLabel: Record<Duration, string> = {
   [Duration.long_]: "30 seconds",
 };
 
-function MockVideoPlayer({
+const DEMO_VIDEO_URL = "https://www.w3schools.com/html/mov_bbb.mp4";
+
+function VideoPlayer({
   style,
-  isPlaying,
-  onToggle,
+  videoUrl,
 }: {
   style: Style;
-  isPlaying: boolean;
-  onToggle: () => void;
+  videoUrl?: string;
 }) {
   const thumb = styleThumbs[style] ?? styleThumbs[Style.cinematic];
+  const src =
+    videoUrl && videoUrl !== "https://example.com/mockvideo.mp4"
+      ? videoUrl
+      : DEMO_VIDEO_URL;
+
   return (
-    <button
-      type="button"
-      className="relative w-full aspect-video rounded-2xl overflow-hidden bg-muted/30 group cursor-pointer"
-      onClick={onToggle}
-      aria-label={isPlaying ? "Pause video" : "Play video"}
-    >
-      <img
-        src={thumb}
-        alt="Video preview"
-        className={cn(
-          "w-full h-full object-cover transition-all duration-500",
-          isPlaying ? "scale-105 brightness-75" : "scale-100",
-        )}
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-background/50 to-transparent" />
-
-      {/* Play/Pause Button */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={isPlaying ? "pause" : "play"}
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.8, opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="absolute inset-0 flex items-center justify-center"
-        >
-          <div
-            className={cn(
-              "w-16 h-16 rounded-full flex items-center justify-center transition-all",
-              isPlaying
-                ? "glass-strong opacity-0 group-hover:opacity-100"
-                : "glass-strong glow-violet",
-            )}
-          >
-            {isPlaying ? (
-              <Pause className="w-7 h-7 text-foreground" />
-            ) : (
-              <Play className="w-7 h-7 text-primary ml-1" />
-            )}
-          </div>
-        </motion.div>
-      </AnimatePresence>
-
-      {/* Progress bar (mock) */}
-      {isPlaying && (
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-foreground/10">
-          <motion.div
-            className="h-full bg-primary"
-            initial={{ width: "0%" }}
-            animate={{ width: "100%" }}
-            transition={{ duration: 15, ease: "linear" }}
-          />
-        </div>
-      )}
-
-      {/* Mock controls */}
-      <div
-        className={cn(
-          "absolute bottom-4 left-4 right-4 flex items-center gap-3 transition-opacity",
-          isPlaying ? "opacity-0 group-hover:opacity-100" : "opacity-0",
-        )}
+    <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black">
+      <video
+        key={src}
+        className="w-full h-full object-contain"
+        controls
+        autoPlay={false}
+        poster={thumb}
+        preload="metadata"
       >
-        <span className="text-xs text-foreground/70 font-mono">0:00</span>
-        <div className="flex-1 h-0.5 bg-foreground/20 rounded-full" />
-        <span className="text-xs text-foreground/70 font-mono">0:15</span>
-        <Video className="w-4 h-4 text-foreground/50" />
-      </div>
-    </button>
+        <source src={src} type="video/mp4" />
+        <track kind="captions" />
+        Your browser does not support the video tag.
+      </video>
+    </div>
   );
 }
 
@@ -142,7 +90,6 @@ function JobDetailContent({ jobId }: { jobId: bigint }) {
   const queryClient = useQueryClient();
   const { actor } = useActor();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
 
   // Poll for active jobs
@@ -225,11 +172,7 @@ function JobDetailContent({ jobId }: { jobId: bigint }) {
     <div className="space-y-6">
       {/* Video player / status area */}
       {job.status === Status.completed ? (
-        <MockVideoPlayer
-          style={job.style}
-          isPlaying={isPlaying}
-          onToggle={() => setIsPlaying((v) => !v)}
-        />
+        <VideoPlayer style={job.style} videoUrl={job.videoUrl} />
       ) : job.status === Status.processing ? (
         <div className="relative aspect-video rounded-2xl overflow-hidden glass flex flex-col items-center justify-center gap-6">
           <div className="absolute inset-0 opacity-20">
@@ -350,7 +293,28 @@ function JobDetailContent({ jobId }: { jobId: bigint }) {
       </motion.div>
 
       {/* Actions */}
-      <div className="flex items-center gap-3 pt-2">
+      <div className="flex items-center gap-3 pt-2 flex-wrap">
+        {job.status === Status.completed &&
+          (() => {
+            const downloadUrl =
+              job.videoUrl &&
+              job.videoUrl !== "https://example.com/mockvideo.mp4"
+                ? job.videoUrl
+                : DEMO_VIDEO_URL;
+            return (
+              <a
+                href={downloadUrl}
+                download="ai-video.mp4"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Download className="w-4 h-4" />
+                  Download Video
+                </Button>
+              </a>
+            );
+          })()}
         <Button
           variant="destructive"
           onClick={handleDelete}
