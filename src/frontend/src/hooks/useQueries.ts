@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type { Duration, Status, Style } from "../backend.d";
 import { useActor } from "./useActor";
@@ -60,40 +61,74 @@ export function useVideoJob(id: bigint) {
 
 // ── Create Job ─────────────────────────────────────────────────────────────────
 export function useCreateVideoJob() {
-  const { actor } = useActor();
-  const { identity } = useInternetIdentity();
+  const { actor, isFetching: actorFetching } = useActor();
+  const { identity, isInitializing } = useInternetIdentity();
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async ({
-      prompt,
-      style,
-      duration,
-    }: {
-      prompt: string;
-      style: Style;
-      duration: Duration;
-    }) => {
-      if (!actor) throw new Error("Not authenticated");
-      if (!identity) throw new Error("Please sign in to generate a video");
-      return actor.createVideoJob(prompt, style, duration);
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["myJobs"] });
-      void queryClient.invalidateQueries({ queryKey: ["latestJobs"] });
-    },
-    onError: (err: Error) => {
-      const msg = err.message ?? "Failed to create video job";
-      if (
-        msg.toLowerCase().includes("sign in") ||
-        msg.toLowerCase().includes("authenticated")
-      ) {
-        toast.error("Please sign in to generate a video");
-      } else {
+  // Keep a ref that always points to the latest actor -- avoids stale closure
+  // in the mutationFn polling loop.
+  const actorRef = useRef(actor);
+  useEffect(() => {
+    actorRef.current = actor;
+  }, [actor]);
+
+  const actorReady = !!identity && !isInitializing && !actorFetching;
+
+  return {
+    actorReady,
+    ...useMutation({
+      mutationFn: async ({
+        prompt,
+        style,
+        duration,
+      }: {
+        prompt: string;
+        style: Style;
+        duration: Duration;
+      }) => {
+        if (!identity) throw new Error("Please sign in to generate a video");
+
+        // Use the ref so we always read the latest actor value, even inside
+        // async callbacks where the outer closure would be stale.
+        let resolvedActor = actorRef.current;
+
+        if (!resolvedActor) {
+          // Wait up to 8 seconds for the actor to initialise
+          resolvedActor = await new Promise<typeof actor>((resolve, reject) => {
+            let waited = 0;
+            const interval = setInterval(() => {
+              waited += 200;
+              const current = actorRef.current;
+              if (current) {
+                clearInterval(interval);
+                resolve(current);
+              } else if (waited >= 8000) {
+                clearInterval(interval);
+                reject(
+                  new Error(
+                    "Could not connect to the backend. Please refresh and try again.",
+                  ),
+                );
+              }
+            }, 200);
+          });
+        }
+
+        if (!resolvedActor)
+          throw new Error("Backend not ready, please try again");
+
+        return resolvedActor.createVideoJob(prompt, style, duration);
+      },
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: ["myJobs"] });
+        void queryClient.invalidateQueries({ queryKey: ["latestJobs"] });
+      },
+      onError: (err: Error) => {
+        const msg = err.message ?? "Failed to create video job";
         toast.error(msg);
-      }
-    },
-  });
+      },
+    }),
+  };
 }
 
 // ── Delete Job ─────────────────────────────────────────────────────────────────

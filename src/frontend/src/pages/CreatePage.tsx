@@ -130,14 +130,13 @@ function CreateForm() {
     Duration.medium,
   );
   const { mutateAsync: createJob, isPending } = useCreateVideoJob();
-  const { identity, login } = useInternetIdentity();
+  const { identity } = useInternetIdentity();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!identity) {
       toast.error("Please sign in to generate a video");
-      login();
       return;
     }
     if (!prompt.trim()) {
