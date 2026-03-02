@@ -9,7 +9,42 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Duration, Style } from "../backend.d";
 import { AuthGuard } from "../components/AuthGuard";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useCreateVideoJob } from "../hooks/useQueries";
+
+const styleFallbackGradients: Record<Style, string> = {
+  [Style.cinematic]: "linear-gradient(135deg, #1a1a2e, #16213e)",
+  [Style.animated]: "linear-gradient(135deg, #0f3460, #533483)",
+  [Style.realistic]: "linear-gradient(135deg, #1b1b2f, #2c3e50)",
+  [Style.cartoon]: "linear-gradient(135deg, #7b1fa2, #ad1457)",
+  [Style.abstract_]: "linear-gradient(135deg, #006494, #00796b)",
+};
+
+function StyleThumb({
+  src,
+  alt,
+  styleValue,
+}: { src: string; alt: string; styleValue: Style }) {
+  const [imgError, setImgError] = useState(false);
+
+  if (imgError) {
+    return (
+      <div
+        className="w-full h-full"
+        style={{ background: styleFallbackGradients[styleValue] }}
+      />
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+      onError={() => setImgError(true)}
+    />
+  );
+}
 
 const styleOptions: {
   value: Style;
@@ -95,10 +130,16 @@ function CreateForm() {
     Duration.medium,
   );
   const { mutateAsync: createJob, isPending } = useCreateVideoJob();
+  const { identity, login } = useInternetIdentity();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!identity) {
+      toast.error("Please sign in to generate a video");
+      login();
+      return;
+    }
     if (!prompt.trim()) {
       toast.error("Please enter a prompt first");
       return;
@@ -199,11 +240,11 @@ function CreateForm() {
                   : "border-border/40 hover:border-border/80",
               )}
             >
-              <div className="relative aspect-video overflow-hidden">
-                <img
+              <div className="relative aspect-video overflow-hidden min-h-[80px]">
+                <StyleThumb
                   src={opt.thumb}
                   alt={opt.label}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  styleValue={opt.value}
                 />
                 <div
                   className={cn(

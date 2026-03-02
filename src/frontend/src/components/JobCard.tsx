@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
 import { ChevronRight, Clock, Film, Timer, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
+import { useState } from "react";
 import type { VideoJob } from "../backend.d";
 import { Duration, Status, Style } from "../backend.d";
 import { useDeleteJob } from "../hooks/useQueries";
@@ -15,6 +16,14 @@ const styleThumbs: Record<Style, string> = {
   [Style.realistic]: "/assets/generated/thumb-realistic.dim_600x340.jpg",
   [Style.abstract_]: "/assets/generated/thumb-abstract.dim_600x340.jpg",
   [Style.cartoon]: "/assets/generated/thumb-cartoon.dim_600x340.jpg",
+};
+
+const styleFallbackGradients: Record<Style, string> = {
+  [Style.cinematic]: "linear-gradient(135deg, #1a1a2e, #16213e)",
+  [Style.animated]: "linear-gradient(135deg, #0f3460, #533483)",
+  [Style.realistic]: "linear-gradient(135deg, #1b1b2f, #2c3e50)",
+  [Style.cartoon]: "linear-gradient(135deg, #7b1fa2, #ad1457)",
+  [Style.abstract_]: "linear-gradient(135deg, #006494, #00796b)",
 };
 
 const durationLabel: Record<Duration, string> = {
@@ -39,6 +48,7 @@ interface JobCardProps {
 export function JobCard({ job, index = 0 }: JobCardProps) {
   const { mutate: deleteJob, isPending: isDeleting } = useDeleteJob();
   const navigate = useNavigate();
+  const [imgError, setImgError] = useState(false);
   const thumb = styleThumbs[job.style] ?? styleThumbs[Style.cinematic];
   const createdDate = new Date(
     Number(job.createdAt / 1_000_000n),
@@ -67,12 +77,24 @@ export function JobCard({ job, index = 0 }: JobCardProps) {
     >
       {/* Thumbnail */}
       <div className="relative aspect-video overflow-hidden bg-muted/30">
-        <img
-          src={thumb}
-          alt={job.prompt}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
-        />
+        {imgError ? (
+          <div
+            className="w-full h-full transition-transform duration-500 group-hover:scale-105"
+            style={{
+              background:
+                styleFallbackGradients[job.style] ??
+                styleFallbackGradients[Style.cinematic],
+            }}
+          />
+        ) : (
+          <img
+            src={thumb}
+            alt={job.prompt}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
+            onError={() => setImgError(true)}
+          />
+        )}
 
         {/* Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />

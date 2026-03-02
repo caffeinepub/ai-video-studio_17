@@ -6,6 +6,7 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
+import { AuthGuard } from "./components/AuthGuard";
 import { Footer } from "./components/Footer";
 import { Navbar } from "./components/Navbar";
 import { CreatePage } from "./pages/CreatePage";
@@ -31,7 +32,11 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  component: LandingPage,
+  component: () => (
+    <AuthGuard>
+      <LandingPage />
+    </AuthGuard>
+  ),
 });
 
 const createRoute_ = createRoute({

@@ -49,20 +49,50 @@ const durationLabel: Record<Duration, string> = {
   [Duration.long_]: "30 seconds",
 };
 
-const DEMO_VIDEO_URL = "https://www.w3schools.com/html/mov_bbb.mp4";
+// Each style maps to a demo video that visually matches the style concept
+const STYLE_DEMO_VIDEOS: Record<Style, string[]> = {
+  [Style.cinematic]: [
+    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+  ],
+  [Style.animated]: [
+    "https://www.w3schools.com/html/mov_bbb.mp4",
+    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+  ],
+  [Style.realistic]: [
+    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
+  ],
+  [Style.cartoon]: [
+    "https://www.w3schools.com/html/movie.mp4",
+    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+  ],
+  [Style.abstract_]: [
+    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+  ],
+};
+
+// Pick a video that matches the style; use jobId as a secondary variation seed
+function getDemoVideo(jobId: bigint, style: Style): string {
+  const videos = STYLE_DEMO_VIDEOS[style] ?? STYLE_DEMO_VIDEOS[Style.cinematic];
+  return videos[Number(jobId % BigInt(videos.length))];
+}
 
 function VideoPlayer({
   style,
   videoUrl,
+  jobId,
 }: {
   style: Style;
   videoUrl?: string;
+  jobId: bigint;
 }) {
   const thumb = styleThumbs[style] ?? styleThumbs[Style.cinematic];
   const src =
     videoUrl && videoUrl !== "https://example.com/mockvideo.mp4"
       ? videoUrl
-      : DEMO_VIDEO_URL;
+      : getDemoVideo(jobId, style);
 
   return (
     <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black">
@@ -172,7 +202,24 @@ function JobDetailContent({ jobId }: { jobId: bigint }) {
     <div className="space-y-6">
       {/* Video player / status area */}
       {job.status === Status.completed ? (
-        <VideoPlayer style={job.style} videoUrl={job.videoUrl} />
+        <div className="space-y-2">
+          <VideoPlayer
+            style={job.style}
+            videoUrl={job.videoUrl}
+            jobId={job.id}
+          />
+          <div className="flex items-start gap-2 rounded-xl bg-muted/30 border border-border/40 px-4 py-3">
+            <Film className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-0.5">
+                Style preview: {styleLabel[job.style]}
+              </p>
+              <p className="text-xs text-muted-foreground/70 leading-relaxed">
+                {`This is a style-matched demo clip for your prompt: "${job.prompt.length > 80 ? `${job.prompt.slice(0, 80)}…` : job.prompt}"`}
+              </p>
+            </div>
+          </div>
+        </div>
       ) : job.status === Status.processing ? (
         <div className="relative aspect-video rounded-2xl overflow-hidden glass flex flex-col items-center justify-center gap-6">
           <div className="absolute inset-0 opacity-20">
@@ -300,7 +347,7 @@ function JobDetailContent({ jobId }: { jobId: bigint }) {
               job.videoUrl &&
               job.videoUrl !== "https://example.com/mockvideo.mp4"
                 ? job.videoUrl
-                : DEMO_VIDEO_URL;
+                : getDemoVideo(job.id, job.style);
             return (
               <a
                 href={downloadUrl}

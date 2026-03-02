@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { Duration, Status, Style } from "../backend.d";
 import { useActor } from "./useActor";
+import { useInternetIdentity } from "./useInternetIdentity";
 
 // ── Public Stats ──────────────────────────────────────────────────────────────
 export function usePublicStats() {
@@ -60,6 +61,7 @@ export function useVideoJob(id: bigint) {
 // ── Create Job ─────────────────────────────────────────────────────────────────
 export function useCreateVideoJob() {
   const { actor } = useActor();
+  const { identity } = useInternetIdentity();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -73,6 +75,7 @@ export function useCreateVideoJob() {
       duration: Duration;
     }) => {
       if (!actor) throw new Error("Not authenticated");
+      if (!identity) throw new Error("Please sign in to generate a video");
       return actor.createVideoJob(prompt, style, duration);
     },
     onSuccess: () => {
@@ -80,7 +83,15 @@ export function useCreateVideoJob() {
       void queryClient.invalidateQueries({ queryKey: ["latestJobs"] });
     },
     onError: (err: Error) => {
-      toast.error(err.message ?? "Failed to create video job");
+      const msg = err.message ?? "Failed to create video job";
+      if (
+        msg.toLowerCase().includes("sign in") ||
+        msg.toLowerCase().includes("authenticated")
+      ) {
+        toast.error("Please sign in to generate a video");
+      } else {
+        toast.error(msg);
+      }
     },
   });
 }
